@@ -7,9 +7,9 @@ import tomli_w
 CONFIG_PATH = Path.home() / ".gitai" / "config.toml"
 
 DEFAULTS = {
-    "provider": "ollama",
-    "model": "llama3.2",
-    "api_key": "",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "api_key": ""
 }
 
 def load() -> dict[str, Any]:
@@ -24,3 +24,11 @@ def save(updates: dict[str, Any]):
     config.update(updates)
     with open(CONFIG_PATH, "wb") as f:
         tomli_w.dump(config, f)
+
+def show() -> str:
+    config = load()
+    return "\n".join(f"{k}: {v}" for k, v in config.items())
+
+if __name__ == "__main__":
+    # For quickly resetting to defaults during testing
+    save(DEFAULTS)
