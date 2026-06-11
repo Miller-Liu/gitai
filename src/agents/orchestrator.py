@@ -1,45 +1,30 @@
-from langchain.tools import tool
+import json
 
 from src.agents.base import BaseAgent
+from src.prompts import ORCHESTRATOR_PROMPT
 from src.tools.filesystem import FILESYSTEM_TOOLS
-from src.tools.prompts import ORCHESTRATOR_PROMPT
 
-_findings: dict[str, str] = {}
-
-def _make_spawn_tool():
-    @tool
-    def spawn_specialist(domain: str, description: str) -> str:
-        """Spawn a specialist agent to analyze a specific module or domain.
-        
-        Args:
-            domain: Short name for the domain e.g. 'auth', 'api', 'frontend'
-            description: What files or concerns this specialist should focus on
-        """
-        from src.agents.specialist import SpecialistAgent
-        specialist = SpecialistAgent(domain=domain)
-        result = specialist.run(
-            f"Analyze the '{domain}' module. Focus on: {description}"
-        )
-        _findings[domain] = result
-        return f"Specialist '{domain}' completed."
-    return spawn_specialist
-
-@tool
-def get_findings() -> str:
-    """Get all findings collected from specialists so far."""
-    if not _findings:
-        return "No specialists have reported yet."
-    return "\n\n---\n\n".join(
-        f"## {domain}\n{finding}" 
-        for domain, finding in _findings.items()
-    )
 
 class OrchestratorAgent(BaseAgent):
-    system_prompt = ORCHESTRATOR_PROMPT
-
     def __init__(self):
-        spawn_tool = _make_spawn_tool()
         super().__init__(
-            system_prompt=self.system_prompt,
-            tools=FILESYSTEM_TOOLS + [spawn_tool, get_findings]
+            system_prompt=ORCHESTRATOR_PROMPT,
+            tools=FILESYSTEM_TOOLS
         )
+
+    def propose_divisions(self, file_tree: str) -> dict:
+        result = self.run(
+            f"Analyze this file tree and propose module divisions.\n\n"
+            f"File tree:\n{file_tree}"
+        )
+        parsed = self._parse_json(result)
+        return {"divisions": [], **parsed}
+
+    def revise_divisions(self, proposal: dict, issues: list[str]) -> dict:
+        result = self.run(
+            f"Revise these module divisions based on specialist feedback.\n\n"
+            f"Current divisions:\n{json.dumps(proposal, indent=2)}\n\n"
+            f"Feedback:\n" + "\n".join(f"- {issue}" for issue in issues)
+        )
+        parsed = self._parse_json(result)
+        return {"divisions": [], **parsed}

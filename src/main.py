@@ -23,15 +23,8 @@ def commit():
 @app.command()
 def explain():
     """Explain how this codebase works."""
-    
-    if not Path(".git").exists():
-        console.print("[red]Not a git repository.[/red]")
-        raise typer.Exit(1)
-    
-    console.print("[purple]Analyzing codebase...[/purple]")
-    agent = OrchestratorAgent()
-    result = agent.run("Explain how this codebase works.")
-    console.print(result)
+    from src.features.explain import run
+    run()
 
 @app.command()
 def push():
