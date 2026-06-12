@@ -80,6 +80,7 @@ Questions you answered for other specialists:
 {answered_questions}
 
 Synthesize everything into a final comprehensive analysis.
+Do NOT use any tools — respond directly from your current knowledge.
 
 Respond with ONLY this JSON:
 {{

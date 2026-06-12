@@ -1,10 +1,6 @@
-from pathlib import Path
-
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
-
-from src.agents.orchestrator import OrchestratorAgent
 
 load_dotenv()
 app = typer.Typer(help="AI-powered git assistant")

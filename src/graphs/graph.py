@@ -1,7 +1,6 @@
 from langgraph.graph import END, StateGraph
 
 from src.graphs.nodes.critic import critic_node
-from src.graphs.nodes.manager import manager_node
 from src.graphs.nodes.orchestrator import orchestrator_node
 from src.graphs.nodes.specialist import (
     next_phase_node,
@@ -9,7 +8,6 @@ from src.graphs.nodes.specialist import (
     setup_node,
     specialist_node,
 )
-from src.graphs.nodes.synthesis import synthesis_node
 from src.graphs.routers.execution import after_phase, after_specialist
 from src.graphs.routers.planning import after_critic
 from src.graphs.state import ExecutionState, PlanningState
@@ -40,16 +38,12 @@ def build_execution_graph():
     graph.add_node("pick_domain", pick_domain_node)
     graph.add_node("specialist", specialist_node)
     graph.add_node("next_phase", next_phase_node)
-    graph.add_node("manager", manager_node)
-    graph.add_node("synthesis", synthesis_node)
 
+    # Routing
     graph.set_entry_point("setup")
     graph.add_edge("setup", "pick_domain")
-    graph.add_conditional_edges(
-        "pick_domain",
-        lambda state: "specialist",
-        {"specialist": "specialist"}
-    )
+    graph.add_edge("pick_domain", "specialist")
+
     graph.add_conditional_edges(
         "specialist",
         after_specialist,
@@ -63,19 +57,9 @@ def build_execution_graph():
         after_phase,
         {
             "pick_domain": "pick_domain",
-            "manager": "manager",
+            "manager": END,
         }
     )
-    graph.add_conditional_edges(
-        "manager",
-        after_phase,
-        {
-            "synthesis": "synthesis",
-            "replan": END,
-            "pick_domain": "pick_domain",
-        }
-    )
-    graph.add_edge("synthesis", END)
 
     return graph.compile()
 
@@ -93,8 +77,6 @@ def run_explain() -> str:
     divisions = planning_result["proposal"].get("divisions", [])
     if not divisions:
         return "Could not determine codebase structure."
-    
-    print(divisions) # for debugging
 
     # phase 2 — execution
     execution_graph = build_execution_graph()
@@ -105,9 +87,44 @@ def run_explain() -> str:
         "done_this_phase": [],
         "round": 0,
         "findings": {},
-        "manager_verdict": {},
-        "feedback_type": "none",
-        "final_output": ""
     })
 
     return execution_result.get("final_output", "No output generated.")
+
+def run_test():
+    divisions = [
+        {
+            "domain": "core",
+            "files": [
+            "src/agents/base.py",
+            "src/agents/critic.py",
+            "src/agents/manager.py",
+            "src/agents/orchestrator.py",
+            "src/agents/specialist.py",
+            "src/agents/synthesis.py",
+            "src/main.py"
+            ],
+            "rationale": "These files contain the core logic for the codebase."
+        },
+        {
+            "domain": "tools",
+            "files": [
+            "src/tools/filesystem.py",
+            "src/tools/git.py"
+            ],
+            "rationale": "These files contain utility functions for interacting with the file system and git."
+        }
+    ]
+
+    # phase 2 — execution
+    execution_graph = build_execution_graph()
+    execution_result = execution_graph.invoke({
+        "divisions": divisions,
+        "phase": "",
+        "current_domain": "",
+        "done_this_phase": [],
+        "round": 0,
+        "findings": {}
+    })
+
+    return execution_result

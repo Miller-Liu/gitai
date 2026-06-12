@@ -1,7 +1,7 @@
 from src.agents.specialist import SpecialistAgent
 from src.graphs.state import ExecutionState
 
-MAX_ROUNDS = 3
+MAX_ROUNDS = 2
 
 def setup_node(state: ExecutionState) -> ExecutionState:
     """Create all specialists from divisions."""
@@ -87,6 +87,8 @@ def specialist_node(state: ExecutionState) -> ExecutionState:
 
     if not specialist:
         return state
+    
+    findings = state.get("findings", {})
 
     match state["phase"]:
         case "understand":
@@ -94,11 +96,12 @@ def specialist_node(state: ExecutionState) -> ExecutionState:
         case "answer":
             specialist.answer()
         case "finalize":
-            specialist.understand(final=True)
+            findings = {**findings, domain: specialist.understand(final=True)}
 
     done_this_phase = state.get("done_this_phase", []) + [domain]
 
     return {
         **state,
         "done_this_phase": done_this_phase,
+        "findings": findings,
     }

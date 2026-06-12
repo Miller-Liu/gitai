@@ -7,21 +7,14 @@ def after_specialist(state: ExecutionState) -> str:
 
     if len(done) < len(all_domains):
         return "pick_domain"
+    
     return "next_phase"
 
 def after_phase(state: ExecutionState) -> str:
     match state["phase"]:
-        case "understand" | "answer":
+        case "understand" | "answer" | "finalize":
             return "pick_domain"
-        case "finalize":
-            return "manager"
         case "manager":
-            match state.get("feedback_type", "none"):
-                case "replan":
-                    return "replan"
-                case "revise_domains":
-                    return "pick_domain"
-                case _:
-                    return "synthesis"
+            return "manager"
         case _:
             return "pick_domain"

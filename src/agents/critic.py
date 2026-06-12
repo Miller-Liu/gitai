@@ -7,7 +7,7 @@ class CriticAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             system_prompt=CRITIC_PROMPT,
-            tools=FILESYSTEM_TOOLS
+            tools=[]
         )
 
     def evaluate(self, proposal: dict) -> dict:

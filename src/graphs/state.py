@@ -15,6 +15,3 @@ class ExecutionState(TypedDict):
     done_this_phase: list[str]
     round: int
     findings: dict[str, str]   # only populated in finalize
-    manager_verdict: dict
-    feedback_type: str
-    final_output: str

@@ -9,7 +9,7 @@ class OrchestratorAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             system_prompt=ORCHESTRATOR_PROMPT,
-            tools=FILESYSTEM_TOOLS
+            tools=[]
         )
 
     def propose_divisions(self, file_tree: str) -> dict:

@@ -32,8 +32,8 @@ def show() -> str:
 if __name__ == "__main__":
     # For quickly resetting to defaults during testing
     save({
-        "provider": "google_genai",
-        "model": "gemini-2.0-flash",
+        "provider": "groq",
+        "model": "llama-3.1-8b-instant",
         "api_key": ""
     })
     print(show())
