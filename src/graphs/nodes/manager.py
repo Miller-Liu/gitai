@@ -4,16 +4,10 @@ from src.graphs.state import ExecutionState
 _manager = ManagerAgent()
 
 def manager_node(state: ExecutionState) -> ExecutionState:
-    verdict = _manager.validate(
-        findings=state.get("findings", {}),
-        questions=state.get("questions", []),
-        answers=state.get("answers", []),
-        divisions=state.get("divisions", [])
-    )
-
+    """Dummy manager — always approves."""
     return {
         **state,
-        "manager_verdict": verdict,
-        "feedback_type": verdict.get("feedback_type", "none"),
-        "execution_approved": verdict.get("execution_approved", False),
+        "phase": "manager",
+        "manager_verdict": {"approved": True},
+        "feedback_type": "none",
     }

@@ -66,7 +66,9 @@ def tool_list_directory(path: str) -> str:
 
 @tool
 def tool_search_code(query: str) -> str:
-    """Search for a string across the repo."""
+    """Search for a short keyword or phrase across the repo. Keep query under 50 chars."""
+    if len(query) > 50:
+        return "Error: search query too long. Use a short keyword instead."
     results = search_code(query)
     return "\n".join(results) if results else "No results found."
 

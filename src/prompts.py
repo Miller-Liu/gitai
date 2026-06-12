@@ -39,70 +39,72 @@ Return ONLY a JSON object:
     "suggested_revision": "optional suggestion"
 }"""
 
-SPECIALIST_PROMPT = """You are a specialist code analyst focused on the '{domain}' module.
 
-Analyze the code thoroughly using your tools. Understand:
-- What this module does and why it exists
-- Key classes, functions, and patterns
-- How it connects to other parts of the codebase
-- Any important implementation details
+SPECIALIST_PROMPT = """You are a specialist code analyst focused on the '{domain}' module.
+Use your tools to thoroughly read and understand the code in your domain.
+Be specific and technical. Always read the actual files — never guess.
 
 Other modules in this codebase you can direct questions to:
 {all_domains}
 
-Only ask questions to these specific domain names.
+Only ask questions to these specific domain names — no others."""
 
-Be specific and technical. Read the actual files — don't guess.
-"""
 
-SPECIALIST_START = """Analyze the '{domain}' module. Files: {files}
+SPECIALIST_START = """Analyze the '{domain}' module.
 
-Use your tools to read the files and understand:
-- What this module does
-- Key classes and functions
+Your assigned files: {files}
+
+Use your tools to read each file thoroughly. Understand:
+- What this module does and why it exists
+- Key classes, functions, and patterns
 - Any dependencies on other modules you notice
 
-After analyzing, return JSON:
+Respond with ONLY this JSON:
 {{
-    "finding": "your detailed analysis here",
+    "finding": "your detailed technical analysis",
     "questions": [
-        {{"to": "domain_name", "question": "specific question about their code"}}
+        {{"to": "domain_name", "question": "specific question"}}
     ]
 }}
 
-Only ask questions if you genuinely need information from another module.
-Return ONLY the JSON object."""
+Only ask questions if you genuinely need information to complete your analysis.
+Respond with ONLY the JSON object, nothing else."""
 
-SPECIALIST_REPEAT = """You are refining your analysis of the '{domain}' module.
 
-Your previous finding:
-{previous_finding}
+SPECIALIST_FINAL = """You are finalizing your analysis of the '{domain}' module.
 
-Questions asked of you by other specialists:
-{incoming_questions}
+Your current understanding:
+{current_finding}
 
-Answers you received to your questions:
-{received_answers}
+Questions you answered for other specialists:
+{answered_questions}
 
-Peer findings from other specialists:
-{peer_findings}
+Synthesize everything into a final comprehensive analysis.
 
-Update your analysis incorporating this new information. Then decide if you are satisfied.
-
-Return JSON:
+Respond with ONLY this JSON:
 {{
-    "finding": "your updated detailed analysis",
-    "answers": [
-        {{"to": "domain_that_asked_you", "question": "exact question being answered", "answer": "..."}}
-    ],
-    "questions": [
-        {{"to": "domain_name", "question": "any remaining questions"}}
-    ],
-    "satisfied": true/false,
-    "reason": "why you are or aren't satisfied"
+    "finding": "your final comprehensive analysis incorporating all information gathered"
 }}
 
-Return ONLY the JSON object."""
+Respond with ONLY the JSON object, nothing else."""
+
+
+SPECIALIST_ANSWER = """You are a specialist in the '{domain}' module.
+
+{asker} is asking you: "{question}"
+
+Your current understanding of your module:
+{finding}
+
+Answer specifically and technically based on what you know.
+
+Respond with ONLY this JSON:
+{{
+    "answer": "your specific technical answer"
+}}
+
+Respond with ONLY the JSON object, nothing else."""
+
 
 MANAGER_PROMPT = """You are a code review manager validating specialist findings.
 

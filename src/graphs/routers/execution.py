@@ -1,23 +1,27 @@
 from src.graphs.state import ExecutionState
 
 
-def after_specialists(state: ExecutionState) -> str:
-    all_domains = [d["domain"] for d in state.get("divisions", [])]
-    submitted = state.get("submitted", [])
-    current_round = state.get("round", 1)
-    max_rounds = state.get("max_rounds", 3)
+def after_specialist(state: ExecutionState) -> str:
+    all_domains = [d["domain"] for d in state["divisions"]]
+    done = state.get("done_this_phase", [])
 
-    if all(d in submitted for d in all_domains):
-        return "manager"
-    if current_round >= max_rounds:
-        return "manager"
-    return "next_round"
+    if len(done) < len(all_domains):
+        return "pick_domain"
+    return "next_phase"
 
-def after_manager(state: ExecutionState) -> str:
-    match state.get("feedback_type", "none"):
-        case "replan":
-            return "replan"
-        case "revise_domains":
-            return "specialists"
+def after_phase(state: ExecutionState) -> str:
+    match state["phase"]:
+        case "understand" | "answer":
+            return "pick_domain"
+        case "finalize":
+            return "manager"
+        case "manager":
+            match state.get("feedback_type", "none"):
+                case "replan":
+                    return "replan"
+                case "revise_domains":
+                    return "pick_domain"
+                case _:
+                    return "synthesis"
         case _:
-            return "synthesis"
+            return "pick_domain"

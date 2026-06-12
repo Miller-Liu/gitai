@@ -31,4 +31,9 @@ def show() -> str:
 
 if __name__ == "__main__":
     # For quickly resetting to defaults during testing
-    save(DEFAULTS)
+    save({
+        "provider": "google_genai",
+        "model": "gemini-2.0-flash",
+        "api_key": ""
+    })
+    print(show())

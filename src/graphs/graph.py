@@ -1,17 +1,19 @@
-from langgraph.constants import Send
 from langgraph.graph import END, StateGraph
 
 from src.graphs.nodes.critic import critic_node
 from src.graphs.nodes.manager import manager_node
 from src.graphs.nodes.orchestrator import orchestrator_node
-from src.graphs.nodes.specialist import specialist_node
+from src.graphs.nodes.specialist import (
+    next_phase_node,
+    pick_domain_node,
+    setup_node,
+    specialist_node,
+)
 from src.graphs.nodes.synthesis import synthesis_node
-from src.graphs.routers.execution import after_manager, after_specialists
+from src.graphs.routers.execution import after_phase, after_specialist
 from src.graphs.routers.planning import after_critic
 from src.graphs.state import ExecutionState, PlanningState
 from src.tools.filesystem import get_file_tree
-
-MAX_ITERATIONS = 3
 
 # ── planning graph ────────────────────────────────────────────────
 
@@ -31,50 +33,51 @@ def build_planning_graph():
 
     return graph.compile()
 
-# ── execution graph ───────────────────────────────────────────────
-
-def increment_round(state: ExecutionState) -> ExecutionState:
-    return {**state, "round": state.get("round", 1) + 1}
-
-def dispatch_specialists(state: ExecutionState):
-    """Fan out — spawn one specialist node per division."""
-    return [
-        Send("specialist", {**state, "domain": d["domain"]})
-        for d in state.get("divisions", [])
-    ]
-
 def build_execution_graph():
     graph = StateGraph(ExecutionState)
 
-    graph.add_node("specialist", dispatch_specialists) # type: ignore
-    graph.add_node("increment_round", increment_round)
+    graph.add_node("setup", setup_node)
+    graph.add_node("pick_domain", pick_domain_node)
+    graph.add_node("specialist", specialist_node)
+    graph.add_node("next_phase", next_phase_node)
     graph.add_node("manager", manager_node)
     graph.add_node("synthesis", synthesis_node)
 
-    graph.set_entry_point("specialist")
+    graph.set_entry_point("setup")
+    graph.add_edge("setup", "pick_domain")
+    graph.add_conditional_edges(
+        "pick_domain",
+        lambda state: "specialist",
+        {"specialist": "specialist"}
+    )
     graph.add_conditional_edges(
         "specialist",
-        after_specialists,
+        after_specialist,
         {
-            "manager": "manager",
-            "next_round": "increment_round",
+            "pick_domain": "pick_domain",
+            "next_phase": "next_phase"
         }
     )
-    graph.add_edge("increment_round", "specialist")
+    graph.add_conditional_edges(
+        "next_phase",
+        after_phase,
+        {
+            "pick_domain": "pick_domain",
+            "manager": "manager",
+        }
+    )
     graph.add_conditional_edges(
         "manager",
-        after_manager,
+        after_phase,
         {
             "synthesis": "synthesis",
-            "specialists": "specialist",
-            "replan": END
+            "replan": END,
+            "pick_domain": "pick_domain",
         }
     )
     graph.add_edge("synthesis", END)
 
     return graph.compile()
-
-# ── master runner ─────────────────────────────────────────────────
 
 def run_explain() -> str:
     # phase 1 — planning
@@ -90,25 +93,21 @@ def run_explain() -> str:
     divisions = planning_result["proposal"].get("divisions", [])
     if not divisions:
         return "Could not determine codebase structure."
+    
+    print(divisions) # for debugging
 
     # phase 2 — execution
-    total_files = sum(len(d.get("files", [])) for d in divisions)
-    max_rounds = max(3, total_files // 10)
-
     execution_graph = build_execution_graph()
     execution_result = execution_graph.invoke({
         "divisions": divisions,
+        "phase": "",
+        "current_domain": "",
+        "done_this_phase": [],
+        "round": 0,
         "findings": {},
-        "questions": [],
-        "answers": [],
-        "submitted": [],
-        "round": 1,
-        "max_rounds": max_rounds,
         "manager_verdict": {},
         "feedback_type": "none",
-        "execution_approved": False,
-        "final_output": "",
-        "domain": ""
+        "final_output": ""
     })
 
     return execution_result.get("final_output", "No output generated.")

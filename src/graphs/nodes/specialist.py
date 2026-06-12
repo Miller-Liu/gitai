@@ -1,71 +1,104 @@
 from src.agents.specialist import SpecialistAgent
 from src.graphs.state import ExecutionState
 
-_specialists: dict[str, SpecialistAgent] = {}
+MAX_ROUNDS = 3
 
-def get_specialist(domain: str, files: list[str], all_divisions: list[dict]) -> SpecialistAgent:
-    if domain not in _specialists:
-        _specialists[domain] = SpecialistAgent(
-            domain=domain,
-            files=files,
-            all_divisions=all_divisions
+def setup_node(state: ExecutionState) -> ExecutionState:
+    """Create all specialists from divisions."""
+    SpecialistAgent.clear_registry()
+
+    for d in state["divisions"]:
+        SpecialistAgent(
+            all_divisions=state["divisions"],
+            domain=d["domain"],
+            files=d["files"],
+            rationale=d.get("rationale", "")
         )
-    return _specialists[domain]
-
-def specialist_node(state: ExecutionState, domain: str) -> ExecutionState:
-    division = next(
-        (d for d in state["divisions"] if d["domain"] == domain),
-        None
-    )
-    if not division:
-        return state
-
-    specialist = get_specialist(domain, division.get("files", []), state["divisions"])
-    current_round = state.get("round", 1)
-
-    if current_round == 1:
-        result = specialist.start()
-    else:
-        my_questions = [q for q in state.get("questions", []) if q["to"] == domain]
-        my_answers = [a for a in state.get("answers", []) if a["to"] == domain]
-        peer_findings = "\n\n".join(
-            f"[{d}]: {finding}"
-            for d, finding in state.get("findings", {}).items()
-            if d != domain
-        ) or "No peer findings yet."
-
-        result = specialist.repeat(
-            previous_finding=state.get("findings", {}).get(domain, "None yet"),
-            incoming_questions=my_questions,
-            received_answers=my_answers,
-            peer_findings=peer_findings
-        )
-
-    findings = {**state.get("findings", {}), domain: result.get("finding", "")}
-
-    # keep only unanswered questions
-    remaining_questions = [
-        q for q in state.get("questions", [])
-        if not (q["to"] == domain and any(
-            a["to"] == q["from"] for a in result.get("answers", [])
-        ))
-    ]
-
-    questions = remaining_questions + [
-        {**q, "from": domain} for q in result.get("questions", [])
-    ]
-
-    answers = state.get("answers", []) + [
-        {**a, "from": domain} for a in result.get("answers", [])
-    ]
-    submitted = state.get("submitted", [])
-    if result.get("satisfied") and domain not in submitted:
-        submitted = submitted + [domain]
 
     return {
         **state,
-        "findings": findings,
-        "questions": questions,
-        "answers": answers,
-        "submitted": submitted,
+        "phase": "understand",
+        "current_domain": "",
+        "done_this_phase": [],
+        "round": 1,
+        "findings": {},
+    }
+
+def pick_domain_node(state: ExecutionState) -> ExecutionState:
+    all_domains = [d["domain"] for d in state["divisions"]]
+    done = state.get("done_this_phase", [])
+
+    for domain in all_domains:
+        if domain not in done:
+            return {**state, "current_domain": domain}
+
+    return state
+
+def next_phase_node(state: ExecutionState) -> ExecutionState:
+    current_phase = state["phase"]
+    current_round = state["round"]
+    all_domains = [d["domain"] for d in state["divisions"]]
+
+    match current_phase:
+        case "understand":
+            # after understand, always go to answer
+            new_phase = "answer"
+            new_round = current_round
+
+        case "answer":
+            # check if any specialist still has pending questions
+            any_pending = any(
+                len(SpecialistAgent.get(d).pending_questions) > 0 # type: ignore
+                for d in all_domains
+                if SpecialistAgent.get(d)
+            )
+            if any_pending:
+                # another answer cycle
+                new_phase = "answer"
+                new_round = current_round
+            elif current_round >= MAX_ROUNDS:
+                # hit max rounds, finalize
+                new_phase = "finalize"
+                new_round = current_round
+            else:
+                # back to understand
+                new_phase = "understand"
+                new_round = current_round + 1
+
+        case "finalize":
+            # after finalize, snapshot findings and go to manager
+            new_phase = "manager"
+            new_round = current_round
+
+        case _:
+            new_phase = current_phase
+            new_round = current_round
+
+    return {
+        **state,
+        "phase": new_phase,
+        "round": new_round,
+        "done_this_phase": [],
+    }
+
+def specialist_node(state: ExecutionState) -> ExecutionState:
+    domain = state["current_domain"]
+    specialist = SpecialistAgent.get(domain)
+
+    if not specialist:
+        return state
+
+    match state["phase"]:
+        case "understand":
+            specialist.understand()
+        case "answer":
+            specialist.answer()
+        case "finalize":
+            specialist.understand(final=True)
+
+    done_this_phase = state.get("done_this_phase", []) + [domain]
+
+    return {
+        **state,
+        "done_this_phase": done_this_phase,
     }
